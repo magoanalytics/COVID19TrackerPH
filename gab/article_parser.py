@@ -102,8 +102,8 @@ def get_covid_counts():
 
     topics = []
     for x in listWords:
-        res = topic_modeler(x, 1, 30)
-        res = res.show_topic(0, topn = 30)
+        res = topic_modeler(x, 1, 10)
+        res = res.show_topic(0, topn = 10)
         topics.append([word[0] for word in res])
 
     df['LDA_Topics'] = topics
@@ -202,6 +202,8 @@ def get_covid_counts():
             count_fixer.append(row['counts'])
 
     df['counts'] = count_fixer
+    
+    df.to_csv('pre_processed_data.csv', index = False)
     
     # Filtering tables to those with PH Locations identified -----------------------
     
