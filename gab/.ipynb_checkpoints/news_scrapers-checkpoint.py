@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import time
 from urllib.request import Request, urlopen
+import re
 
 
 def get_abscbn():
@@ -65,7 +66,7 @@ def get_abscbn():
                 continue
                 
             if title in article_list:
-                print('Reach latest article')
+                print('Reached latest article')
                 break
 
             print(title, date)
@@ -111,6 +112,9 @@ def get_rappler():
     
     
     # Scraping all the articles in the list
+    
+    df = pd.read_csv('scraped_data/rappler_tracker_scraped.csv')
+    article_list = list(df['title'].unique())
 
     for article in rappler_news:  
         user_agent = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:55.0) '
@@ -136,9 +140,14 @@ def get_rappler():
             text = soup.find("div", {'class':"cXenseParse"}).text
         except AttributeError:
             continue
+            
+        if (title in article_list) & (title != 'WATCH: DOH updates on 2019 novel coronavirus'):
+            print('Reached latest article')
+            break
 
         print(title, date)
         rappler_df = rappler_df.append(pd.Series([article_id,date,category, title,author, text], index = rappler_df.columns ), ignore_index=True)
         time.sleep(10)
-    
-    rappler_df.to_csv('rappler_tracker_scraped.csv', index = False)
+        
+    df = df.append(rappler_df)
+    df.to_csv('scraped_data/rappler_tracker_scraped.csv', index = False)
