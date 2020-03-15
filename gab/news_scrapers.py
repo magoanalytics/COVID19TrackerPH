@@ -151,3 +151,115 @@ def get_rappler():
         
     df = df.append(rappler_df)
     df.to_csv('scraped_data/rappler_tracker_scraped.csv', index = False)
+    
+    
+    
+    
+def get_mb():
+    try:
+        mb_ncov_news = []
+        user_agent = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:55.0)'
+
+
+        req = Request('https://news.mb.com.ph/tag/ncov', headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+                    'Accept-Encoding': 'none',
+                    'Accept-Language': 'en-US,en;q=0.8',
+                    'Connection': 'keep-alive'})
+
+
+        content = urlopen(req).read()
+
+        #print('reading url')
+        soup = BeautifulSoup(content)
+
+        last_page = int(soup.find("ul", {'class':"uk-pagination"}).text[-3:]) + 1  
+        
+        df_list = pd.read_csv('articles_list/mb_ncov_articles_urls.csv', header = None)
+        article_list = df_list[0]
+        
+        loop = True
+        
+        print('start')
+        for i in range(1, last_page):
+
+            page_link = 'https://news.mb.com.ph/tag/ncov/page' + str(i) + '/'
+            print(page_link)
+            req = Request(page_link, headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+                    'Accept-Encoding': 'none',
+                    'Accept-Language': 'en-US,en;q=0.8',
+                    'Connection': 'keep-alive'})
+
+            content = urlopen(req).read()
+
+            #print('reading url')
+            soup = BeautifulSoup(content)
+
+            #print('reading main news section')
+            mydivs = soup.find("main", {'class':"tm-content"})
+
+            #print('reading urls in news section')
+            mydivs = mydivs.find_all("article", {'class':"uk-article listwiththumb"})
+            
+            for url in mydivs:
+                #print(url.a['href'])
+                if url.a['href'] in article_list.values:
+                    loop = False
+                    print(url.a['href'] + ' stopped latest')
+                    break
+                else:
+                    mb_ncov_news.append(url.a['href'])
+            
+            if loop == False:
+                break
+            #mb_ncov_news += [url.a['href'] for url in mydivs]
+
+            #print(i)
+            #print(len(mb_ncov_news))
+            time.sleep(1)
+
+        to_add = pd.Series(mb_ncov_news)
+        #f['articles'] = article_list.append(to_add).reset_index(drop = True)
+        #df.to_csv('new_mb_ncov_articles.csv', index = False)
+        
+        mb_df = pd.DataFrame(columns = ['source_id','date','category','title','author','text'])
+        df = pd.read_csv('scraped_data/mb_scraped.csv')
+        
+        print(len(mb_ncov_news))
+        
+        for article in mb_ncov_news:  
+            user_agent = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:55.0) '
+            req = Request(article, headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+                    'Accept-Encoding': 'none',
+                    'Accept-Language': 'en-US,en;q=0.8',
+                    'Connection': 'keep-alive'})
+            content = urlopen(req).read()
+            soup = BeautifulSoup(content)
+
+            try:
+                article_id = ''
+                date = soup.find('time').text
+                category = 'nCov'
+                title = soup.find("h1", {'class':"uk-article-title uk-margin-bottom-remove"}).text
+                author = soup.find('strong').text
+                art = soup.find_all("p")
+                text = ' '.join(item.text for item in art)
+            except AttributeError:
+                continue
+
+            print(title, date)
+            mb_df = mb_df.append(pd.Series([article_id,date,category, title,author, text], index = mb_df.columns ), ignore_index=True)
+            time.sleep(3)
+
+        df = df.append(mb_df)
+        df.to_csv('scraped_data/mb_scraped.csv', index = False)
+        
+        df_list[0].append(to_add).reset_index(drop = True).to_csv('articles_list/mb_ncov_articles_urls.csv', index = False)
+        
+    except: 
+        print('Error')
