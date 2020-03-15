@@ -263,3 +263,98 @@ def get_mb():
         
     except: 
         print('Error')
+        
+def get_mt():    
+    user_agent = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:55.0)'
+    page_url = 'https://www.manilatimes.net/?s=coronavirus'
+    manila_times_news = []
+
+    df_list = pd.read_csv('articles_list/m_times_articles_urls.csv', header = None);
+    article_list = df_list[0]
+
+    while page_url != False:
+        req = Request(page_url, headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+            'Accept-Encoding': 'none',
+            'Accept-Language': 'en-US,en;q=0.8',
+            'Connection': 'keep-alive'})
+        content = urlopen(req).read()
+        soup = BeautifulSoup(content)
+        res = (soup.find_all('a',{'rel':"bookmark"}))
+
+        #manila_times_news += [url['href'] for url in res]
+        for url in res:
+            if url['href'] in article_list.values:
+                page_url = False
+                print(url['href'] + ' stopped latest')
+                break
+            else:
+                manila_times_news.append(url['href'])
+
+        if page_url == False:
+            break
+
+        date = (soup.find_all('time'))
+
+        page_link = soup.find('div',{'class':"page-nav"} )
+
+        time.sleep(3)
+        if date[0]['datetime'] < '2020-01-20':
+            page_url = False
+        else:
+            page_url =  page_link.find_all('a')[-1]['href']
+            print(page_url)
+
+    mt_df = pd.DataFrame(columns = ['source_id','date','category','title','author','text'])
+    df = pd.read_csv('scraped_data/manila_times_scraped.csv')
+
+    try:    
+        for article in manila_times_news:  
+            user_agent = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:55.0) '
+            req = Request(article, headers={'User-Agent': "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.11 (KHTML, like Gecko) Chrome/23.0.1271.64 Safari/537.11",
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.3',
+                'Accept-Encoding': 'none',
+                'Accept-Language': 'en-US,en;q=0.8',
+                'Connection': 'keep-alive'})
+            content = urlopen(req).read()
+            soup = BeautifulSoup(content)
+
+            try:
+                article_id = ''
+
+                date = soup.find('time').text
+
+                category = 'nCov'
+                title = soup.find('h1', {'class' : 'tdb-title-text'}).text
+                author = soup.find('a', {'class' : 'tdb-author-name'}).text
+
+                text = soup.find('div', {'class' : 'td-post-content'})
+                text.find_all('p')
+
+                paragraph = ""
+                for x in text.find_all('p'):
+                    paragraph += x.text.strip() + " " 
+
+                text = paragraph
+            except AttributeError:
+                continue
+
+            if (title in df['title'].values):
+                print('Reached latest article')
+                break
+
+            print(title, date)
+            mt_df = mt_df.append(pd.Series([article_id,date,category, title,author, text], index = mt_df.columns ), ignore_index=True)
+            time.sleep(2)
+
+        df = df.append(mt_df)
+        df.to_csv('scraped_data/manila_times_scraped.csv', index = False)
+
+        df_list[0].append(manila_times_news).reset_index(drop = True).to_csv('articles_list/m_times_articles_urls.csv', index = False)
+
+    except:
+        df = df.append(mt_df)
+        df.to_csv('scraped_data/manila_times_scraped.csv', index = False)
+
