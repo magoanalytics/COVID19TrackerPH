@@ -4,6 +4,10 @@ import pandas as pd
 import nltk
 from nltk import pos_tag
 nltk.download('averaged_perceptron_tagger')
+from nltk import word_tokenize
+from nltk.util import ngrams
+from nltk.corpus import stopwords 
+
 import glob
 from dateutil import parser
 import re
@@ -30,6 +34,92 @@ from gensim.utils import tokenize
 from gensim.parsing.preprocessing import preprocess_string, strip_punctuation, strip_numeric
 
 #--------------------------------------------------------------------------------------------
+
+def parse_raw_data():
+    # Setting up Spacy Tokenizer
+    nlp = English()
+
+    def lemmatizer(doc):
+        # This takes in a doc of tokens from the NER and lemmatizes them. 
+        # Pronouns (like "I" and "you" get lemmatized to '-PRON-', so I'm removing those.
+        doc = [token.lemma_ for token in doc if token.lemma_ != '-PRON-']
+        doc = u' '.join(doc)
+        return nlp.make_doc(doc)
+
+    def remove_stopwords(doc):
+        # This will remove stopwords and punctuation.
+        # Use token.text to return strings, which we'll need for Gensim.
+        doc = [token.text for token in doc if token.is_stop != True and token.is_punct != True]
+        return doc
+
+    # This is a function that will create a model that predicts the topics conveyed by each group 
+
+    def topic_modeler(tokenized_texts, no_topics, no_words):
+        topics = []
+
+        words = corpora.Dictionary(tokenized_texts)
+        corpus = [words.doc2bow(doc) for doc in tokenized_texts]
+
+        lda_model = gensim.models.ldamodel.LdaModel(corpus=corpus,
+                                                   id2word=words,
+                                                    random_state = 3,
+                                                   num_topics= no_topics)
+
+        # Compute Coherence Score
+        coherence_model_lda = CoherenceModel(model=lda_model, texts=tokenized_texts, dictionary=words, coherence='c_v')
+        coherence_lda = coherence_model_lda.get_coherence()
+
+        return lda_model
+
+    # This will add pipelines in our tokenization process.
+
+    nlp.add_pipe(lemmatizer,name='lemmatizer')
+    nlp.add_pipe(remove_stopwords, name="stopwords", last=True)
+
+    files = glob.glob("scraped_data\*.csv")
+    dfs = [pd.read_csv(f) for f in files]
+    df = pd.concat(dfs,ignore_index=True, sort = False)
+    df['date'] = [parser.parse(date).strftime('%Y-%m-%d') for date in df['date']]
+    #df = df[(df['text'].str.contains('coronavirus'))]
+    #df = df[df['category'] == 'Philippines']
+    df = df.drop_duplicates()
+    df = df.reset_index(drop = True)
+
+    parsed_df = pd.read_csv('raw_parsed_data_articles.csv')
+    df = df[~df['title'].isin(parsed_df['title'])]
+    
+    if len(df) == 0:
+        return "Nothing new to parse"
+
+    # LDA Topics 
+
+    df['text'] = [re.sub(r'\r\n', '', text) for text in df['text']]
+
+    words = df['text'].str.lower()
+    listWords = []
+    for item in words:
+        listWords.append([nlp(item)])
+
+    topics = []
+    for x in listWords:
+        res = topic_modeler(x, 1, 20)
+        res = res.show_topic(0, topn = 15)
+        topics.append([word[0] for word in res])
+
+    df['LDA_Topics'] = topics
+    print('done_lda')
+
+    df['text'].apply(lambda x: re.findall("\d+(?:,\d+)?\s+[a-zA-Z]+", x))
+    df['count_docs'] =  df['text'].apply(lambda x: re.findall("\d+(?:,\d+)?\s+[a-zA-Z]+", x))
+
+    df['PH_Loc'] = [list(set(GeoText(content, 'PH').cities)) for content in df['text']]
+    df['PH_Loc'] = [[x.lower() for x in w] for w in df['PH_Loc']]
+    df['PH_Loc'] =[[x.replace('city', '') for x in w] for w in df['PH_Loc']]
+
+
+    parsed_df = parsed_df.append(df)[['date','title','author','text','LDA_Topics','count_docs','PH_Loc']].sort_values('date').reset_index(drop = True)
+    parsed_df = parsed_df[parsed_df['date'] >= '2019-01-01'].reset_index(drop = True)
+    parsed_df.to_csv('raw_parsed_data_articles.csv', index = False)
 
 def get_covid_counts():
     
@@ -94,7 +184,8 @@ def get_covid_counts():
     
     
     # Get LDA Topics -------------------------------
-
+    
+    print('working on LDA')
     words = df['text'].str.lower()
     listWords = []
     for item in words:
@@ -107,6 +198,7 @@ def get_covid_counts():
         topics.append([word[0] for word in res])
 
     df['LDA_Topics'] = topics
+    print('done with LDA')
     
     # Extracting all the counting phrases in the articles -------------------------
 
