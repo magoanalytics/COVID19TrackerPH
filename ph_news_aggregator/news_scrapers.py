@@ -124,10 +124,10 @@ def get_rappler():
             'Accept-Encoding': 'none',
             'Accept-Language': 'en-US,en;q=0.8',
             'Connection': 'keep-alive'})
-        content = urlopen(req).read()
-        soup = BeautifulSoup(content)
-
+        
         try:
+            content = urlopen(req).read()
+            soup = BeautifulSoup(content)
             article_id = ''
             
             date = soup.find("div", {'class':"published"}).text.strip()
@@ -138,7 +138,7 @@ def get_rappler():
             title = soup.find("h1", {'class':"select-headline"}).text
             author = soup.find("a", {'class':"rappler-headline link"}).text.strip()
             text = soup.find("div", {'class':"cXenseParse"}).text
-        except AttributeError:
+        except:
             continue
             
         if (title in article_list) & (title != 'WATCH: DOH updates on 2019 novel coronavirus'):
