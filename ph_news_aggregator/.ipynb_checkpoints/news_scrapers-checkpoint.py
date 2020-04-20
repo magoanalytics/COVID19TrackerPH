@@ -35,6 +35,8 @@ def get_abscbn():
                 page_link = soup.find("a", {'title':"Next"})['href']
             except:
                 page_link = False
+            
+            print('Next page')
 
             abscbn_df = pd.DataFrame(columns = ['source_id','date','category','title','author','text'])
 
@@ -124,10 +126,10 @@ def get_rappler():
             'Accept-Encoding': 'none',
             'Accept-Language': 'en-US,en;q=0.8',
             'Connection': 'keep-alive'})
-        
+        content = urlopen(req).read()
+        soup = BeautifulSoup(content)
+
         try:
-            content = urlopen(req).read()
-            soup = BeautifulSoup(content)
             article_id = ''
             
             date = soup.find("div", {'class':"published"}).text.strip()
@@ -138,11 +140,11 @@ def get_rappler():
             title = soup.find("h1", {'class':"select-headline"}).text
             author = soup.find("a", {'class':"rappler-headline link"}).text.strip()
             text = soup.find("div", {'class':"cXenseParse"}).text
-        except:
+        except AttributeError:
             continue
             
-        if (title in article_list) & (title != 'WATCH: DOH updates on 2019 novel coronavirus'):
-            print('Reached latest article')
+        if (title in article_list) & (title != 'WATCH: DOH updates on 2019 novel coronavirus') & (title != '#DuterteLive: Updates on enhanced community quarantine'):
+            print('Reached latest article ' + title)
             break
 
         print(title, date)
